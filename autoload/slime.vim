@@ -97,12 +97,58 @@ endfunction
 " Neovim Terminal
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
+function! s:ShowConsole()
+    "let l:height = float2nr(0.4*winheight('%'))
+    let l:term_console = 'term://.//console'
+
+    let l:term_console_id = bufwinnr(l:term_console)
+    if l:term_console_id >? 0
+        " if window exist, jump to the window
+        execute l:term_console_id.'wincmd w'
+    else
+        " if window not exist, create window
+        execute 'split'
+        let l:layouts = {'right':'L', 'bottom':'J', 'left':'H', 'top':'K'}
+        " target_pane, such as {right-of}
+        let l:layout = split(b:slime_config['target_pane'], '-')[0][1:]
+        execute "wincmd ".get(l:layouts, l:layout, 'J')
+        "execute l:height.'wincmd _'
+        if bufexists(l:term_console)
+            " if buffer exist, show in the window
+            execute 'buffer '.l:term_console
+        else
+            " if buffer not exist, create new term-ipython-buffer
+            execute 'terminal'
+            setlocal hidden
+            execute 'file '.l:term_console
+
+            call s:PasteInTerm("ipython3\n")
+            sleep 500ms  " wait for ipython start
+        endif
+    endif
+endfunction
+
+function! s:PasteInTerm(text)
+    let @9 = a:text."\n"
+    normal G"9p
+endfunction
+
+function! s:PasteInIPython(text)
+    call s:PasteInTerm( "%cpaste -q\n")
+    call s:PasteInTerm(a:text)
+    call s:PasteInTerm( "\n--\n")
+endfunction
+
 function! s:NeovimSend(config, text)
   " Neovim jobsend is fully asynchronous, it causes some problems with
   " iPython %cpaste (input buffering: not all lines sent over)
   " So this s:WritePasteFile can help as a small lock & delay
   call s:WritePasteFile(a:text)
-  call chansend(str2nr(a:config["jobid"]), split(a:text, "\n", 1))
+  "call chansend(str2nr(a:config["jobid"]), split(a:text, "\n", 1))
+  call s:ShowConsole()
+  call s:PasteInTerm(a:text)
+  wincmd p
+  stopinsert
 endfunction
 
 function! s:NeovimConfig() abort
